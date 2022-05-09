@@ -97,11 +97,11 @@ global with sharing class CF_AccountWS {
         delete thisAccount;
     }   
     @HttpPut
-    global static ID upsertAccount( String Id,String firstName,String middleName,String lastName,String suffix,String documentType,
+    global static ID upsertAccount( String IdAccount,String firstName,String middleName,String lastName,String suffix,String documentType,
                                    String documentNumber,String stratum,String gender,String occupation,String status,
                                    String clientNumberEnelCodensa ) {
                                        Account thisAccount = new Account(
-                                           Id=id,
+                                           Id=IdAccount,
                                            FirstName = firstName,
                                            MiddleName = middleName,
                                            LastName = lastName,
