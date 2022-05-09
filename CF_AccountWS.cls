@@ -12,7 +12,7 @@ global with sharing class CF_AccountWS {
         return result;
     }
     @HttpPost
-    global static String createAccount( CF_AccountWS.accountWrapper wrpAccounts ) {
+    global static String createAccount( CF_AccountWS.AccountWrapper wrpAccounts ) {
         if (wrpAccounts != null) {
             Account  thisAccount = new Account();
             thisAccount.CF_ActivityOccupation__c=String.valueOf(wrpAccounts.occupation);
@@ -137,7 +137,7 @@ global with sharing class CF_AccountWS {
         return thisAccount.Id;
     }
     //Wrapper class to accept all input parameters
-    global class accountWrapper {
+    global class AccountWrapper {
         String occupation;
         String amparateClient;
         Boolean attackVictim;
