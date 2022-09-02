@@ -1,0 +1,183 @@
+<apex:page standardController="Case" extensions="CF_ExtensionTermsPDFController" showHeader="false" sidebar="false" standardStylesheets="false" renderAs="PDF" applyHtmlTag="false" applyBodyTag="false" >
+    <html style="overflow-y: hidden;">
+        <head>
+            <style>
+                @page {
+                margin-top: 100px;
+                padding:0px;
+                margin-bottom: 160px;
+                @top-left {
+                content: element(header);
+                }  
+                
+                @bottom-left {   
+                content: element(footer);
+                }
+                } 
+                
+                div.header {
+                margin-top: 30px;
+                position: running(header);
+                width: 100%;
+                margin-left: 30px;
+                }
+                
+                div.footer {                    
+                position: running(footer);
+                margin-left: -40px;
+                }
+                
+                div.p_graph0 {
+                margin-left: 65px;
+                margin-right: 10px;
+                }
+                
+                div.p_graph1 {
+                text-justify: inter-word;
+                text-align: justify;
+                margin-left: 65px;
+                margin-right: 10px;
+                }
+                
+                div.p_graph2 {
+                text-justify: inter-word;
+                text-align: justify;
+                text-align-last: none;
+                margin-left: 65px;
+                margin-right: 10px;
+                }
+                
+            </style>
+        </head>
+        <body style="height: auto; min-height: auto;">
+            <div class="header" style="text-align: right;">
+                <apex:image alt="rightheader" url="{!URLFOR($Resource.rightheader)}" style="max-width: 675.91px; width: 200px; height: 91px;" title="rightheader" />
+            </div>  
+            <br />
+            <div class="p_graph0">
+                <span style="font-size:10,0000pt">
+                    <span style="font-family:Calibri">
+                        <span style="color:#000000">Bogot&aacute;, D.C, </span>
+                    </span>
+                </span>
+                <span style="font-size:10,0000pt">
+                    <span style="font-family:Calibri">
+                        <span style="color:#000000"><apex:outputText value="{0, date, d'/'MM'/'yyyy}"><apex:param value="{!approvedExtTermsList[0].LastModifiedDate}"/></apex:outputText></span>
+                    </span>
+                </span>
+                <br />
+                <br />
+                <span style="font-size:10,0000pt">
+                    <span style="font-family:Calibri">
+                        <span style="color:#000000">Se&ntilde;or (a)</span>
+                    </span>
+                </span>
+                <br />
+                <span style="font-size:10,0000pt">
+                    <span style="font-family:Calibri">
+                        <span style="color:#000000">{!ocase.Account.Name}</span>
+                    </span>
+                </span>
+                <br />
+                <span style="font-size:10,0000pt">
+                    <span style="font-family:Calibri">
+                        <span style="color:#000000">Bogot&aacute; D.C.</span>
+                    </span>
+                </span>
+                <br />
+                <br />
+                    <span style="font-size:10,0000pt">
+                        <span style="font-family:Calibri">
+                            <span style="color:#000000">Asunto:</span>
+                        </span>
+                    </span>
+                    <span style="font-size:10,0000pt">
+                        <span style="font-family:Calibri">
+                            <span style="color:#000000">{!ocase.CaseNumber}, </span>
+                        </span>
+                    </span>
+                    <span style="font-size:10,0000pt">
+                        <span style="font-family:Calibri">
+                            <span style="color:#000000"><apex:outputText value="{0, date, d'/'MM'/'yyyy}"><apex:param value="{!ocase.CreatedDate}"/></apex:outputText></span>
+                        </span>
+                    </span>
+                    <br />
+                    <span style="font-size:10,0000pt">
+                        <span style="font-family:Calibri">
+                            <span style="color:#000000">Cuenta:</span>
+                        </span>
+                    </span>
+                    <span style="font-size:10,0000pt">
+                        <span style="font-family:Calibri">
+                            <span style="color:#000000">{!ocase.Account.CF_ClientNumberEnelCodensa__c}</span>
+                        </span>
+                    </span>
+                </div>
+            <div class="p_graph1">
+                <span  style="font-size:10,0000pt">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+                <br />
+                <span style="font-size:10,0000pt">
+                    <span style="font-family:Calibri">
+                        <span style="color:#000000">Reciba un cordial saludo de Cr&eacute;dito F&aacute;cil Codensa, en respuesta a su solicitud que usted present&oacute; relacionada con {!ocase.CF_Submotive__c} le informamos lo siguiente:&nbsp;</span>
+                    </span>
+                </span>
+                <br />
+            </div>
+            <div class="p_graph0">
+                <span style="font-size:10,0000pt">
+                    <span style="font-family:Calibri">Se dio inicio a la investigaci&oacute;n de los hechos por usted enunciados, sin embargo, se hace necesario ampliar el t&eacute;rmino de respuesta a su petici&oacute;n por {!approvedExtTermsList[0].CF_ExtensionDays__c} d&iacute;as h&aacute;biles adicionales, con el fin de atender de manera completa su solicitud.</span>
+                </span>
+                <br />
+                <br />
+                <span style="font-size:10,0000pt">
+                    <span style="font-family:'Calibri Light'">Por lo anterior, manifestamos el compromiso de Cr&eacute;dito F&aacute;cil Codensa para brindarle una pronta resoluci&oacute;n a su requerimiento y una vez se haya culminado el procedimiento anteriormente descrito, le daremos a conocer mediante una nueva comunicaci&oacute;n la respuesta definitiva a las inquietudes planteadas.</span>
+                </span>
+                <br />
+                <br />
+            </div>
+            <div class="p_graph2">
+                <span style="font-size:10,0000pt">
+                    <span style="font-family:Calibri">Con esta respuesta Cr&eacute;dito F&aacute;cil Codensa conf&iacute;a en haber resuelto su solicitud y atender&aacute; con gusto cualquier inquietud o tr&aacute;mite adicional al respecto. Comun&iacute;quese con nosotros en la l&iacute;nea de atenci&oacute;n al cliente en Bogot&aacute; (601) 7 421 115 o radique su solicitud a trav&eacute;s de nuestro correo electr&oacute;nico solicitudescredfacil@creditofacilcolpatria.com, donde por su seguridad, es importante recordarle el mantener sus datos actualizados para poder atenderlo. De igual forma, lo invitamos a conocer las recomendaciones de uso de nuestros productos y nuestro programa de educaci&oacute;n financiera en www.creditofacilcodensa.com. S&iacute;ganos en nuestras redes sociales Facebook (Facebook.com/CreditoFacilCodensa) y Twitter (@CreditofCodensa).</span>
+                </span>
+                <br />
+            </div>
+            <br />
+            <div class="p_graph0">
+                <span style="font-size:10,0000pt">
+                    <span style="font-family:Calibri">Cordialmente,</span>
+                </span>
+                <br />
+                <br />
+                <apex:image alt="signature" url="{!URLFOR($Resource.signature)}" style="max-width: 675.91px; width: 120px; height: 70px;" title="signature" />
+                <br />
+                <span style="font-size:10,0000pt">
+                    <span style="font-family:Calibri">
+                        <span style="color:#000000">YADIRA SANABRIA PACHECO</span>
+                    </span>
+                </span>
+                <br />
+                <span style="font-size:10,0000pt">
+                    <span style="font-family:Calibri">Gerente Servicio al Cliente</span>
+                </span>
+                <br />
+                <span style="font-size:10,0000pt">
+                    <span style="font-family:Calibri">Cr&eacute;dito F&aacute;cil Codensa</span>
+                </span>
+                <br />
+                <span style="font-size:10,0000pt">
+                    <span style="font-family:Calibri">SCOTIABANK COLPATRIA</span>
+                </span>
+                <br />
+                <span style="font-size:10,0000pt">
+                    <span style="font-family:Arial">
+                        <span style="color:#000000">{!approvedExtTermsList[0].createdby.Alias}</span>
+                    </span>
+                </span>
+                <br />
+            </div>
+            <div class="footer" >
+                <apex:image alt="generalfooter" url="{!URLFOR($Resource.generalfooter)}" style="max-width: 674.2361175537109px; width: 800px; height: 150px;" title="generalfooter" />
+            </div>
+        </body>
+    </html>
+</apex:page>
