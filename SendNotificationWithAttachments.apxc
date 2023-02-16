@@ -1,0 +1,77 @@
+/*************************************************************************************/
+/* Desarrollado por: VASS
+/* Autor: Mauricio Gomez
+/* Proyecto: Codensa
+/* Descripción: Clase para enviar notificaciónes con archivos adjuntos (especificos)
+/* Cambios (Versiones)
+/* -----------------------------------------------------------------------------------
+/* No. Fecha      Autor        Descripción
+/* ---- ----------- ----------------------- ------------------------------------------
+/* 1.1            Mauricio Gomez      Se Crea clase
+/*************************************************************************************/
+public class SendNotificationWithAttachments {
+    @InvocableMethod(label='Send External Notification With Attachments' description='Send External Notification With Attachments' category='Case')
+    public static void EnviarNotificacion(List<Case> Caso){
+        SendNotificationWithAttachments.prepareMailWithAttach(Caso);
+    }
+    
+    public static Messaging.SingleEmailMessage prepareMailWithAttach(List<Case> Caso) {
+        Id IdCaso= Caso[0].Id;
+        Id orgWideEmailAddressListId = [select id, Address, DisplayName from OrgWideEmailAddress Where DisplayName =: Label.OrgWideEmailAddressExternal].Id;
+        Messaging.SingleEmailMessage message = new Messaging.SingleEmailMessage();
+        message = Messaging.renderStoredEmailTemplate(Label.PlantillaCasosExternaEnProceso, NULL, Caso[0].Id);
+        message.setTreatTargetObjectAsRecipient(false);
+        
+        if(String.isNotBlank(orgWideEmailAddressListId)){
+            message.setOrgWideEmailAddressId(orgWideEmailAddressListId);    
+        }
+        List<String> toAddresses = new List<String>();
+        toAddresses.add(Caso[0].CF_QueueEmail__c);
+        if(toAddresses.size() > 0){
+            message.setToAddresses(toAddresses);
+        }
+        List<Messaging.EmailFileAttachment> emailFileAttList = getContentVers(Caso[0].Id);
+        if(emailFileAttList.size() > 0) {
+            message.setFileAttachments(emailFileAttList);   
+        }
+        message.setTemplateId(label.PlantillaCasosExternaEnProceso);
+        message.setWhatId(Caso[0].Id);
+        message.setSaveAsActivity(false);
+        message.setUseSignature(false);
+        message.setBccSender(false); 
+        
+        try {
+            Messaging.sendEmail(new Messaging.SingleEmailMessage[] { message });
+        } catch (Exception e) {
+            throw e;
+        }   
+        return message;
+    }
+    
+    public static List<Messaging.EmailFileAttachment> getContentVers(Id objId) {  
+        List<Messaging.EmailFileAttachment> emailAttachList = new List<Messaging.EmailFileAttachment>();
+        List<ContentDocumentLink> CDLs = [SELECT ContentDocumentId FROM ContentDocumentLink WHERE LinkedEntityId =: objId];
+        List<Id>CDIdList = new List<Id>();
+        for (ContentDocumentLink nextCDL : CDLs) {
+            CDIdList.add(nextCDL.ContentDocumentId); 
+        }
+        List<ContentDocument> entries = [SELECT Id, Title, FileType FROM ContentDocument WHERE ContentDocument.Id IN :CDIdList];
+        if(entries.size() > 0) {
+            List<ContentVersion> cvList = [	SELECT Id, title, VersionData, FileExtension, ContentDocumentId, ContentSize FROM ContentVersion WHERE ContentDocumentId IN:entries AND DocumentType_fileupload__c = 'TIP014' ];
+            
+            for(ContentVersion cvObj : cvList) {
+                emailAttachList.add(setEmailFileAtt(cvObj));            
+            }
+            return emailAttachList;
+        }
+        return emailAttachList;
+    }
+    
+    public static Messaging.EmailFileAttachment setEmailFileAtt(ContentVersion cvObj) {
+        Messaging.EmailFileAttachment emlAtt = new Messaging.EmailFileAttachment();
+        Blob fileData = cvObj.VersionData;
+        emlAtt.setFilename(cvObj.Title + '.' + cvObj.FileExtension);
+        emlAtt.setBody(fileData);
+        return emlAtt;
+    }
+}
