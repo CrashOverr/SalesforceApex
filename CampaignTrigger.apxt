@@ -1,0 +1,7 @@
+trigger CampaignTrigger on Campaign (after update) {
+
+    Campaign_hdl handler = new Campaign_hdl(Trigger.isExecuting, Trigger.size);
+	if(Trigger.isUpdate && Trigger.isAfter){
+            handler.OnAfterUpdate(Trigger.old, Trigger.new);
+        }
+}
