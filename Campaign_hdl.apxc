@@ -1,0 +1,253 @@
+public without sharing class Campaign_hdl {
+    private static Integer countAfter = 0;
+    public static boolean ejecuta = false;
+    private boolean blnIsExecuting = false;
+    private integer intBatchSize = 0;
+    public Campaign_hdl() {
+    }
+    
+    // Constructor
+    public Campaign_hdl(boolean isExecuting, integer size){
+        blnIsExecuting = isExecuting;
+        intBatchSize = size;
+    }
+    public void OnAfterUpdate(campaign[] oldRecords, campaign[] updatedRecords){
+        if(updatedRecords[0].Status=='In Progress' && oldRecords[0].Status=='Planned'){
+            campaign  campana =[select id,Owner.Manager.Email from campaign where id =: updatedRecords[0].id];
+            if(campana.Owner.Manager.Email!=null){
+                List<String> toAddresses = new List<String>();
+                toAddresses.add(campana.Owner.Manager.Email);
+                Messaging.SingleEmailMessage email = new Messaging.SingleEmailMessage();
+                email.setTemplateId(label.plantillaCampana);
+                email.setSaveAsActivity(false);
+                email.setTreatTargetObjectAsRecipient(false);
+                email.setToAddresses(toAddresses);
+                email.setWhatId(updatedRecords[0].Id);
+                email.setTargetObjectId([select id from contact limit 1].id);
+                email.setOrgWideEmailAddressId(label.OrfDefault);
+                Messaging.SendEmailResult [] r =Messaging.sendEmail(new Messaging.SingleEmailMessage[] {email});
+            }else{
+                updatedRecords[0].addError('Por favor asigne un gestor al propietario de la campaña.');
+            }
+        }
+        if(updatedRecords[0].RecordTypeId != Schema.SObjectType.Campaign.getRecordTypeInfosByDeveloperName().get('CashBack').getRecordTypeId() && updatedRecords[0].isactive && !oldRecords[0].isactive){
+            list<CampaignMember> MiembrosdeCampana =[Select Id, CF_BackofficeManager__c,CF_ProductType__c, CF_FinancialProducts__c,CF_Comments__c,CF_CardSupplier__c,Name,Contact.AccountId ,CF_AvailabilityAdvanceQuota__c,
+                                                     CF_Commission__c,CF_ManagementChannel__c,CF_CardType__c, CF_Rate__c,CampaignId,CF_ManagementChannelCoordinator__c,CF_CLVSegment__c,CF_Propensity__c, CF_AverageTerm__c,
+                                                     CF_Rate6__c,CF_Rate12__c,CF_Rate24__c,CF_Rate36__c,CF_Rate48__c,CF_Rate60__c,CF_Rate72__c,CF_Amount6__c,CF_Amount12__c ,CF_Amount24__c,CF_Amount36__c,CF_Amount48__c,
+                                                     CF_Amount60__c,CF_Amount72__c
+                                                     FROM CampaignMember where CampaignId =: updatedRecords[0].id];
+            List<Opportunity> OportunidadesCrear = new List<Opportunity>();
+            List<Quote> OfertasCrear = new List<Quote>();
+            List<QuoteLineItem> ProductoxOfertasCrear = new List<QuoteLineItem>();
+            List<PricebookEntry> PricebookList = new List<PricebookEntry>();
+            List<Product2> Product2List = new List<Product2>();
+            
+            
+            if(updatedRecords[0].RecordTypeId == Schema.SObjectType.Campaign.getRecordTypeInfosByDeveloperName().get('CF_Advances').getRecordTypeId() || updatedRecords[0].RecordTypeId == Schema.SObjectType.Campaign.getRecordTypeInfosByDeveloperName().get('Redeferred').getRecordTypeId() || updatedRecords[0].RecordTypeId == Schema.SObjectType.Campaign.getRecordTypeInfosByDeveloperName().get('CertifiedDeliveryMaintenance').getRecordTypeId()){
+                Product2List = [Select Id from Product2 where Name ='Tarjeta de crédito'];
+                if(Product2List.size()>0){
+                    PricebookList = [Select Id,Pricebook2Id,Pricebook2.Name from PricebookEntry where Product2Id =:Product2List[0].Id and Pricebook2.Name='COLOMBIA COP'];
+                    if(PricebookList.size()<=0){
+                        updatedRecords[0].addError('Debe tener Configurado una Lista de Precios para el Producto utilizado en esta Campaña');
+                    }
+                }else{
+                    updatedRecords[0].addError('Debe tener Configurado un Producto en el Catálogo para este tipo de Campaña');
+                }
+            }
+            
+            for(CampaignMember miembro : MiembrosdeCampana){
+                opportunity opp = new opportunity();
+                quote quoteItem = new quote();
+                quotelineitem qlItem= new quotelineitem();
+                
+                opp.AccountId = miembro.Contact.AccountId ;
+                opp.CF_AvailabilityAdvanceQuota__c = miembro.CF_AvailabilityAdvanceQuota__c;
+                opp.CF_Commission__c = miembro.CF_Commission__c;
+                opp.CF_ManagementChannel__c = miembro.CF_ManagementChannel__c;
+                opp.CF_Rate__c = miembro.CF_Rate__c;
+                opp.CampaignId = miembro.CampaignId;
+                opp.CloseDate = updatedRecords[0].EndDate;
+                opp.LeadSource = 'Campañas';
+                opp.Name = updatedRecords[0].CF_CampaignNumber__c+'-'+miembro.Name;
+                opp.StageName = 'Abierta';
+                
+                if(miembro.CF_ManagementChannelCoordinator__c!=null){
+                    opp.OwnerId = miembro.CF_ManagementChannelCoordinator__c;
+                }
+                
+                if(updatedRecords[0].RecordTypeId == Schema.SObjectType.Campaign.getRecordTypeInfosByDeveloperName().get('Redeferred').getRecordTypeId()){
+                    
+                    //Oportunidad
+                    opp.CF_ProductType__c = 'Tarjeta de Credito';
+                    opp.RecordTypeId = Schema.SObjectType.Opportunity.getRecordTypeInfosByDeveloperName().get('Rediferidos').getRecordTypeId();
+                    opp.CF_Comments__c =miembro.CF_Comments__c;
+                    opp.CF_PlasticType__c = miembro.CF_CardType__c;
+                    opp.CF_CLVSegment__c =	miembro.CF_CLVSegment__c;
+                    opp.CF_Propensity__c = miembro.CF_Propensity__c;
+                    opp.CF_AverageTerm__c = miembro.CF_AverageTerm__c;
+                    opp.CF_CampaignMemberId__c = miembro.Id;
+                    opp.Pricebook2Id = PricebookList[0].Pricebook2Id;
+                    
+                    //Oferta 6
+                    if( miembro.CF_Rate6__c !=null){
+                       OfertasCrear.add(getQuote(opp,Schema.SObjectType.Quote.getRecordTypeInfosByDeveloperName().get('Rediferidos').getRecordTypeId(),PricebookList[0].Pricebook2Id,miembro.CF_Rate6__c,6,miembro.CF_Amount6__c));
+                    }
+                    //Oferta 12
+                    if( miembro.CF_Rate12__c !=null){
+                       OfertasCrear.add(getQuote(opp,Schema.SObjectType.Quote.getRecordTypeInfosByDeveloperName().get('Rediferidos').getRecordTypeId(),PricebookList[0].Pricebook2Id,miembro.CF_Rate12__c,12,miembro.CF_Amount12__c));
+                    }
+                    //Oferta 24
+                    if( miembro.CF_Rate24__c !=null){
+                       OfertasCrear.add(getQuote(opp,Schema.SObjectType.Quote.getRecordTypeInfosByDeveloperName().get('Rediferidos').getRecordTypeId(),PricebookList[0].Pricebook2Id,miembro.CF_Rate24__c,24,miembro.CF_Amount24__c));
+                    }
+                    //Oferta 36
+                    if( miembro.CF_Rate36__c !=null){
+                       OfertasCrear.add(getQuote(opp,Schema.SObjectType.Quote.getRecordTypeInfosByDeveloperName().get('Rediferidos').getRecordTypeId(),PricebookList[0].Pricebook2Id,miembro.CF_Rate36__c,36,miembro.CF_Amount36__c));
+                    }
+                    //Oferta 48
+                    if( miembro.CF_Rate48__c !=null){
+                       OfertasCrear.add(getQuote(opp,Schema.SObjectType.Quote.getRecordTypeInfosByDeveloperName().get('Rediferidos').getRecordTypeId(),PricebookList[0].Pricebook2Id,miembro.CF_Rate48__c,48,miembro.CF_Amount48__c));
+                    }
+                    //Oferta 60
+                    if( miembro.CF_Rate60__c !=null){
+                       OfertasCrear.add(getQuote(opp,Schema.SObjectType.Quote.getRecordTypeInfosByDeveloperName().get('Rediferidos').getRecordTypeId(),PricebookList[0].Pricebook2Id,miembro.CF_Rate60__c,60,miembro.CF_Amount60__c));
+                    }
+                    //Oferta 72
+                    if( miembro.CF_Rate72__c !=null){
+                       OfertasCrear.add(getQuote(opp,Schema.SObjectType.Quote.getRecordTypeInfosByDeveloperName().get('Rediferidos').getRecordTypeId(),PricebookList[0].Pricebook2Id,miembro.CF_Rate72__c,72,miembro.CF_Amount72__c));
+                    }
+                    //Oferta 0
+                    if(miembro.CF_Rate6__c ==null && miembro.CF_Rate12__c ==null && miembro.CF_Rate24__c ==null && miembro.CF_Rate36__c ==null && miembro.CF_Rate48__c ==null && miembro.CF_Rate60__c ==null && miembro.CF_Rate72__c ==null){
+                      OfertasCrear.add(getQuote(opp,Schema.SObjectType.Quote.getRecordTypeInfosByDeveloperName().get('Rediferidos').getRecordTypeId(),PricebookList[0].Pricebook2Id,0,0,0));
+                    }
+                    
+                }
+                else if(updatedRecords[0].RecordTypeId == Schema.SObjectType.Campaign.getRecordTypeInfosByDeveloperName().get('CF_Advances').getRecordTypeId()){
+
+                    //Oportunidad
+                    opp.CF_ProductType__c = 'Tarjeta de Credito';
+                    opp.RecordTypeId = Schema.SObjectType.Opportunity.getRecordTypeInfosByDeveloperName().get('Avances').getRecordTypeId();
+                    opp.CF_BackofficeManager__c =miembro.CF_BackofficeManager__c;
+                    opp.CF_Comments__c =miembro.CF_Comments__c;
+                    opp.CF_CampaignMemberId__c = miembro.Id;
+                    opp.Pricebook2Id = PricebookList[0].Pricebook2Id;
+                    
+                    //Oferta
+                    quoteItem.Name = 'Oferta ' + System.today().day()+ System.today().month()+' #'+'1';
+                    quoteItem.ExpirationDate = opp.CloseDate;
+                    quoteItem.Status = 'Propuesta';
+                    quoteItem.CF_OpportunityKey__c = opp.name+'-'+opp.CF_ProductType__c+'-'+opp.CF_CampaignMemberId__c;
+                    quoteItem.RecordTypeId = Schema.SObjectType.Quote.getRecordTypeInfosByDeveloperName().get('CF_Advances').getRecordTypeId();
+                    quoteItem.Pricebook2Id = PricebookList[0].Pricebook2Id;
+               		OfertasCrear.add(quoteItem);
+                    
+                    //Producto por Oferta
+                    qlItem.CF_QuoteKey__c = opp.name+'-'+opp.CF_ProductType__c+'-'+opp.CF_CampaignMemberId__c;
+                    qlItem.CF_FinancialAccount__c = miembro.CF_FinancialProducts__c;
+                    qlItem.Quantity = 1;
+                    qlItem.UnitPrice = 0;	
+                    qlItem.PricebookEntryId = PricebookList[0].Id;
+                    ProductoxOfertasCrear.add(qlItem);
+                    
+                }
+                else if(updatedRecords[0].RecordTypeId == Schema.SObjectType.Campaign.getRecordTypeInfosByDeveloperName().get('Insurance').getRecordTypeId()){
+                    
+                    opp.Amount = updatedRecords[0].CF_BonusValue__c;
+                    opp.CF_AvailabilityAdvanceQuota__c = miembro.CF_AvailabilityAdvanceQuota__c;
+                    opp.CF_Commission__c = miembro.CF_Commission__c;
+                    opp.CF_InsuranceCarrier__c = updatedRecords[0].CF_InsuranceCompany__c;
+                    opp.CF_InsuranceContactChannel__c = 'Telefonico';
+                    opp.CF_InsuranceName__c = updatedRecords[0].CF_PolicyName__c;
+                    opp.CF_ManagementChannel__c = miembro.CF_ManagementChannel__c;
+                    opp.CF_PlasticType__c = miembro.CF_CardType__c;
+                    opp.CF_PremiumValue__c = updatedRecords[0].CF_BonusValue__c;
+                    opp.CF_TypeOfInsurance__c = updatedRecords[0].CF_PoliceType__c;
+                    opp.CF_ProductType__c = 'Seguro Voluntario';
+                    opp.RecordTypeId = Schema.SObjectType.Opportunity.getRecordTypeInfosByDeveloperName().get('Seguros_Voluntarios').getRecordTypeId();
+                    
+                }
+                else if(updatedRecords[0].RecordTypeId == Schema.SObjectType.Campaign.getRecordTypeInfosByDeveloperName().get('UpgradeCreditCard').getRecordTypeId()){
+                    opp.CF_ProductType__c = miembro.CF_ProductType__c;
+                    opp.RecordTypeId = Schema.SObjectType.Opportunity.getRecordTypeInfosByDeveloperName().get('Actualizacion').getRecordTypeId();
+                    opp.CF_PlasticType__c = miembro.CF_CardType__c;
+                    opp.CF_ManagementChannel__c = miembro.CF_ManagementChannel__c;
+                    opp.CF_Commission__c = miembro.CF_Commission__c;
+                    opp.CF_BackofficeManager__c =miembro.CF_BackofficeManager__c;
+                    opp.CF_Comments__c =miembro.CF_Comments__c;
+                    
+                }
+                else if(updatedRecords[0].RecordTypeId == Schema.SObjectType.Campaign.getRecordTypeInfosByDeveloperName().get('CertifiedDeliveryMaintenance').getRecordTypeId()){
+                    
+                    //Oportunidad
+                    opp.RecordTypeId = Schema.SObjectType.Opportunity.getRecordTypeInfosByDeveloperName().get('Mantenimiento').getRecordTypeId();
+                    opp.CF_ProductType__c = miembro.CF_ProductType__c;
+                    opp.CF_PlasticType__c = miembro.CF_CardType__c;
+                    opp.CF_ProviderDeliveryPlastic__c=miembro.CF_CardSupplier__c;
+                    opp.CF_Comments__c =miembro.CF_Comments__c;
+                    opp.CF_BackofficeManager__c =miembro.CF_BackofficeManager__c;
+                    opp.CF_CampaignMemberId__c = miembro.Id;
+                    opp.Pricebook2Id = PricebookList[0].Pricebook2Id;
+                    
+                    //Oferta
+                    quoteItem.RecordTypeId = Schema.SObjectType.Quote.getRecordTypeInfosByDeveloperName().get('CF_Update').getRecordTypeId();
+                    quoteItem.Name = 'Oferta ' + System.today().day()+ System.today().month()+' #'+'1';
+                    quoteItem.ExpirationDate = opp.CloseDate;
+                    quoteItem.Status = 'Propuesta';
+                    quoteItem.CF_OpportunityKey__c = opp.name+'-'+opp.CF_ProductType__c+'-'+opp.CF_CampaignMemberId__c;
+                    quoteItem.Pricebook2Id = PricebookList[0].Pricebook2Id;
+               		OfertasCrear.add(quoteItem);
+                    
+                    //Producto por Oferta
+                    qlItem.CF_QuoteKey__c = opp.name+'-'+opp.CF_ProductType__c+'-'+opp.CF_CampaignMemberId__c;
+                    qlItem.CF_FinancialAccount__c = miembro.CF_FinancialProducts__c;
+                    qlItem.Quantity = 1;
+                    qlItem.UnitPrice = 0;	
+                    qlItem.PricebookEntryId = PricebookList[0].Id;
+                    ProductoxOfertasCrear.add(qlItem);                    
+                }
+                OportunidadesCrear.add(opp);
+            }
+            
+            insert OportunidadesCrear;
+            map<string,opportunity> MapOppIds = new map<string,opportunity>();
+            
+            map<string,quote> MapQuoteIds = new map<string,quote>();
+            
+            for(opportunity oppty:OportunidadesCrear){
+                MapOppIds.put(oppty.name+'-'+oppty.CF_ProductType__c+'-'+oppty.CF_CampaignMemberId__c,oppty);
+            }
+            if(OfertasCrear.size()>0){
+                for(quote q:OfertasCrear){
+                    MapQuoteIds.put(q.CF_OpportunityKey__c,q);
+                    q.OpportunityId = MapOppIds.get(q.CF_OpportunityKey__c).Id;
+                } 
+                insert OfertasCrear;
+            }
+            if(ProductoxOfertasCrear.size()>0){
+                for(quotelineitem qli:ProductoxOfertasCrear){
+                    qli.QuoteId = MapQuoteIds.get(qli.CF_QuoteKey__c).Id;
+                } 
+                insert ProductoxOfertasCrear;
+            }
+            
+            
+            
+        }
+    }
+    
+    public static quote getQuote(opportunity opp, string RecordTypeId,id Pricebook2Id, Decimal Rate, Decimal Term, Decimal Amount){
+        //Oferta
+        quote quoteItem = new quote();
+        quoteItem.Name = 'Oferta ' + System.today().day()+ System.today().month()+' #'+'1';
+        quoteItem.ExpirationDate = opp.CloseDate;
+        quoteItem.Status = 'Propuesta';
+        quoteItem.CF_OpportunityKey__c = opp.name+'-'+opp.CF_ProductType__c+'-'+opp.CF_CampaignMemberId__c;
+        quoteItem.CF_Rate__c=Rate;
+        quoteItem.CF_Term__c=Term;
+        quoteItem.CF_Total__c=Amount;
+        quoteItem.RecordTypeId = RecordTypeId;
+        quoteItem.Pricebook2Id = Pricebook2Id;
+        
+        return quoteItem;
+    }
+}
