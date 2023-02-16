@@ -1,0 +1,75 @@
+/*==============================================================================================================================
+* @className        CF_GeneralCaseClosureNotificationBatch
+* @description      Apex batch General Case Closure Notification
+* @author           vasslatam.com
+* @version          V0.1 
+* @testClass        
+* @dateCreated      2023/01/15
+* =============================================================================================================================*/
+global class CF_GeneralCaseClosureNotificationBatch implements Database.Batchable<sObject>, schedulable {
+    global List<String> errorMessages = new List<String>();
+    
+    global Database.QueryLocator start(Database.BatchableContext BC){
+        system.debug('=====  CF_GeneralCaseClosureNotificationBatch START ====');
+        
+        //Cuando el campo CF_NotificationDate__c, sea igual a la fecha actual, debe enviar una notificacion por registro, al responsable del caso (OwnerId)
+        
+        DateTime todaysDate = System.today();
+        //String currentDate = todaysDate.format('yyyy-MM-dd');
+        String currentDate = '2023-02-15';
+        System.debug('currentDate::: ' + currentDate);
+        String query = 'SELECT Id,CaseNumber,CreatedDate,CF_Notified__c,CF_ExpectedSolutionDate__c,CF_NotificationDate__c,Case.OwnerId FROM Case WHERE CF_Notified__c=false AND Status != \'Cerrado\' AND CF_ExpectedSolutionDate__c!=null AND CF_NotificationDate__c=' + currentDate;
+        System.debug('query::: ' + query);
+        return database.getQueryLocator(query);
+    }
+    
+    global void execute(Database.BatchableContext BC, List<Case> scope){
+        system.debug('=====  WS_CaseNotificationsBatch EXECUTE====');      
+        List<Id> lstIds= new List<Id>();
+        
+        for(Case c: scope){
+            c.CF_Notified__c = true;
+            lstIds.add(c.OwnerId);
+        }
+        update scope;
+        
+        EmailTemplate et = [SELECT Id FROM EmailTemplate WHERE DeveloperName =: Label.PlantillaNotificacionCaso];
+        Messaging.MassEmailMessage mail = new Messaging.MassEmailMessage();
+
+        mail.setTargetObjectIds(lstIds);
+        mail.setTemplateId(et.id);
+        mail.setSaveAsActivity(false); 
+        Messaging.sendEmail(new Messaging.MassEmailMessage[] { mail });
+    }
+    
+    global void finish(Database.BatchableContext BC){
+        system.debug('=====  WS_CaseNotificationsBatch FINISH===='); 
+        
+        AsyncApexJob aaj = [Select Id, Status, NumberOfErrors, JobItemsProcessed, MethodName, TotalJobItems, CreatedBy.Email from AsyncApexJob where Id =:BC.getJobId()];
+        // Send an email to the Apex job's submitter notifying of job completion.
+        Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();
+        String[] toAddresses = new String[] {aaj.CreatedBy.Email};
+            mail.setToAddresses(toAddresses);
+        mail.setSubject('JOB Salesforce RenewalEmailNotification Finished: ' + aaj.Status);
+        String bodyText = 'Total Job Items ' + aaj.TotalJobItems + ' Number of records processed ' + aaj.JobItemsProcessed + ' with '+ aaj.NumberOfErrors + ' failures.\n';
+        bodyText += 'Number of Error Messages ' + errorMessages.size() + '\n';
+        bodyText += 'Error Message' + String.join(errorMessages, '\n');
+        mail.setPlainTextBody(bodyText);
+        Messaging.sendEmail(new Messaging.SingleEmailMessage[] { mail });
+        
+    }
+    global void execute(SchedulableContext SC) { 
+        database.executeBatch(new CF_GeneralCaseClosureNotificationBatch());
+    }
+    
+    global static void start(integer hour, integer min){
+        string jobName = 'GenCaseClosure';
+        if (hour == 0) {
+            database.executebatch(new CF_GeneralCaseClosureNotificationBatch());
+        }else{
+            jobName = jobName += ' - ' + datetime.now().format();
+            string cron = '0 ' + string.valueOf(min) + ' ' + string.valueof(hour) + ' * * ?';
+            system.schedule(jobName, cron, new CF_GeneralCaseClosureNotificationBatch());
+        }
+    }
+}
