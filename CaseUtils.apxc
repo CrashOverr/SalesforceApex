@@ -1,0 +1,71 @@
+/*************************************************************************************/
+/* Desarrollado por: VASS 
+/* Autor:            
+/* Proyecto:         CreditoFacil
+/* Descripción:      Clase para enviar notificaciónes con archivos adjuntos
+
+/* Cambios (Versiones) 
+/* ----------------------------------------------------------------------------------- 
+/* No.  Fecha       Autor                   Descripción 
+/* ---- ----------- ----------------------- ------------------------------------------
+/* 1.1              Santiago Fuentes        Se Crea clase 
+/*************************************************************************************/
+public class CaseUtils {
+    public static void EnviarNotificacion(list<case> Caso,String TemplateId){        id IdCaso= Caso[0].Id;        EmailTemplate et = [SELECT Id FROM EmailTemplate WHERE DeveloperName =:TemplateId];        Messaging.SingleEmailMessage email = new Messaging.SingleEmailMessage();        list<Messaging.EmailFileAttachment> listaefas=new list <Messaging.EmailFileAttachment>();         List<String> toAddresses = new List<String>();        List<String> toBcAddresses = new List<String>();        toBcAddresses.add(system.label.CopyAddressEmail);        if(!String.isBlank(Caso[0].Smart_Code__c) || !String.isBlank(Caso[0].CF_SmartCode__c)){            Case casoSS = [select account.CF_ClientNameSS__c,Contact.CF_ClientNameSS__c,Account.CF_EmailSS__c,Contact.CF_EmailSS__c from case where id =: IdCaso];            if(casoSS.account.CF_EmailSS__c!=null && casoSS.account.CF_EmailSS__c!=''){                toAddresses.add(casoSS.account.CF_EmailSS__c);            }else if(casoSS.Contact.CF_EmailSS__c!=null && casoSS.Contact.CF_EmailSS__c!=''){                toAddresses.add(casoSS.Contact.CF_EmailSS__c);            }else{                if(caso[0].SuppliedEmail !=null){                    toAddresses.add(Caso[0].SuppliedEmail);                    String[] CCEmails = caso[0].SuppliedEmail.split(';');                  }else if(caso[0].CF_Email__c !=null){                    toAddresses.add(Caso[0].CF_Email__c);                    String[] CCEmails = caso[0].CF_Email__c.split(';');                }             }        }else{            if(caso[0].SuppliedEmail !=null){                toAddresses.add(Caso[0].SuppliedEmail);                String[] CCEmails = caso[0].SuppliedEmail.split(';');              }else if(caso[0].CF_Email__c !=null){                toAddresses.add(Caso[0].CF_Email__c);                String[] CCEmails = caso[0].CF_Email__c.split(';');            }        }        email.setBccAddresses(toBcAddresses);        email.setToAddresses(toAddresses);        email.setTemplateId(et.Id);        email.setWhatId(Caso[0].Id);        email.setSaveAsActivity(false);        email.setTreatTargetObjectAsRecipient(false);        contact contacto= new contact();        contacto.LastName='temporal'+(Math.random()*10000);		contacto.CF_DocumentNumber__c='9999998';        insert contacto;        email.setTargetObjectId(contacto.Id);        Messaging.SendEmailResult [] r =         Messaging.sendEmail(new Messaging.SingleEmailMessage[] {email});         delete contacto;     }
+	   
+    public static String getEquivalentValues(String fieldName, String OriginValue){
+        //Create Locations Map
+        Map<String, String> mapDeptosNameToCode = new Map<String, String>();
+        Map<String, String> mapDeptosCodeToName = new Map<String, String>();
+        Map<String, String> mapMuniNameToCode = new Map<String, String>();
+        Map<String, String> mapMuniCodeToName = new Map<String, String>();
+        for(Schema.Location item : [SELECT Id, Name, CodDepartment__c, LocationType,ExternalReference FROM Location WHERE LocationType IN ('MUN','DEP')]){ if(item.LocationType == 'DEP'){ mapDeptosNameToCode.put(item.Name, item.ExternalReference ); mapDeptosCodeToName.put(item.ExternalReference, item.Name); } if(item.LocationType == 'MUN'){ mapMuniNameToCode.put(item.Name, item.ExternalReference); mapMuniCodeToName.put(item.ExternalReference, item.Name); } }        
+        List<SmartSupervisionMapValues__mdt> ListMetadata = new List<SmartSupervisionMapValues__mdt>();
+        SmartSupervisionMapValues__mdt metadata = null;
+        String defaultValue = 'NA';
+        ListMetadata = [            SELECT FieldName__c,OriginValue__c,TargetValue__c            FROM SmartSupervisionMapValues__mdt            WHERE FieldName__c =: fieldName AND OriginValue__c =: OriginValue LIMIT 1];
+        if( ListMetadata.size() > 0 ){ metadata = ListMetadata[0]; }
+        if((fieldName != 'codigo_pais' || fieldName != 'departamento_cod' || fieldName != 'producto_cod' || fieldName != 'municipio_cod') & metadata != null){ return metadata.TargetValue__c; }else{
+            switch on fieldName { //DEFAULT VALUES
+                when 'codigo_pais' {
+                    return '170';
+                }	
+                when 'departamento_cod' {
+					return mapDeptosNameToCode.get(OriginValue) != null ? mapDeptosNameToCode.get(OriginValue) : '00';
+                } 
+                when 'municipio_cod' {
+					return mapMuniNameToCode.get(OriginValue) != null ? mapMuniNameToCode.get(OriginValue) : '00';
+                }
+                when 'producto_cod' {
+                    return '498';
+                }
+                when 'punto_recepcion' {
+                    return '99';
+                }
+                when else {		  
+                    return '00';
+                }
+            }
+        }
+    }
+    public static Boolean getCountAnexosRadicacion(String casoId){
+        List<ContentDocumentLink> contentDocLinkList = [SELECT ContentDocumentId, LinkedEntityId  FROM ContentDocumentLink WHERE LinkedEntityId =: casoId];
+        
+        //Se guardan los ContentDocumentId anteriores en una lista.
+        set<Id> listContentDocuments = new set<Id>();
+        for(ContentDocumentLink item: contentDocLinkList){ listContentDocuments.add(item.ContentDocumentId); }        
+        List<ContentVersion> listaVersionsFinal = new List<ContentVersion>();
+        listaVersionsFinal = [SELECT VersionData, Title FROM ContentVersion WHERE ContentDocumentId IN: listContentDocuments AND DocumentType_fileupload__c  like '%Radicación%'];
+        system.debug('este es el campo'+ listaVersionsFinal.size() );
+        if(listaVersionsFinal.size() > 0){ system.debug('fue tru' ); return True;
+        }else{
+            system.debug('fue false' );
+            return False;
+        }
+    }
+    
+    @Future(callout=true)
+    public static void SaveResponse(Id caseId,String encryptedString) {         list<case> caso= [select id,AccountID,CF_SmartCode__c,Smart_Code__c,CaseNumber,CF_DocumentNumber__c from case where id =: caseId ];        PageReference pref = page.CF_CaseResponse;        pref.getParameters().put('Id',encryptedString);        Blob Pdf;       try {             Pdf = pref.getContentAsPDF();        }        catch (Exception e) {             Pdf = Blob.valueOf(e.getMessage());        }                ContentVersion docVer = new ContentVersion();         docVer.ContentLocation = 'S';                if((caso[0].CF_SmartCode__c!=null && caso[0].CF_SmartCode__c!='') || (caso[0].Smart_Code__c!=null && caso[0].Smart_Code__c!='')){            docVer.Title = 'PDF-Respuesta Cliente_'+caso[0].CaseNumber+'_'+System.Label.NomenclaturaSS+'.pdf' ;            docVer.PathOnClient  = 'PDF-Respuesta Cliente_'+caso[0].CaseNumber+'_'+System.Label.NomenclaturaSS+'.pdf' ;         }else{             docVer.Title = 'PDF-Respuesta Cliente.pdf' ;             docVer.PathOnClient  = 'PDF-Respuesta Cliente.pdf';         }                docVer.DocumentType_fileupload__c = 'TIP007';         Blob pdfDoc= Pdf;         DocVer.VersionData = pdfDoc;         insert docVer;         String versId = [Select ContentDocumentId From ContentVersion Where Id =:docVer.Id].ContentDocumentId;         ContentDocumentLink docLink = new ContentDocumentLink();         docLink.ContentDocumentId = versId;         docLink.LinkedEntityId = caseId;        docLink.ShareType = 'I';         docLink.Visibility = 'AllUsers';         insert docLink;         ContentDistribution newDist = new ContentDistribution();        List<ContentDistribution> cdistObjList = new  List<ContentDistribution>();        newDist.ContentVersionId = docVer.Id;        newDist.Name = 'Respuesta Cliente';        newDist.PreferencesNotifyOnVisit = false;        newDist.PreferencesAllowViewInBrowser = true;        insert newDist;                cdistObjList = [SELECT DistributionPublicUrl,Password,ExpiryDate FROM ContentDistribution WHERE Id=:newDist.Id];        List<Case> casesToUpdate = new List<Case>();        casesToUpdate.add(new Case(            Id = caseId,            DistributionPublicUrl__c =  cdistObjList[0].DistributionPublicUrl        ));        if (!casesToUpdate.isEmpty()) {            update casesToUpdate;        }        if((caso[0].CF_SmartCode__c!=null && caso[0].CF_SmartCode__c!='') || (caso[0].Smart_Code__c!=null && caso[0].Smart_Code__c!='')){            System.enqueueJob(new WS_SmartUploadFileQueueable(caseId));
+        }       
+    }
+}
